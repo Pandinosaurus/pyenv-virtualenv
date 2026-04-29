@@ -1,0 +1,19 @@
+name: tests
+on: [pull_request, push]
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - macos-14
+          - macos-15
+          - macos-15-intel
+          - macos-26
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: git clone https://github.com/bats-core/bats-core.git --depth=1 -b v1.10.0 bats
+      - run: bats/bin/bats --tap test

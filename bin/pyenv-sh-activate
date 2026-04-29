@@ -25,6 +25,27 @@ resolve_link() {
 unset FORCE
 unset QUIET
 
+# Define `before_activate` and `after_activate` functions that allow
+# plugin hooks to register a string of code for execution before or
+# after activating a virtualenv.
+declare -a before_hooks after_hooks
+
+before_activate() {
+  local hook="$1"
+  before_hooks["${#before_hooks[@]}"]="$hook"
+}
+
+after_activate() {
+  local hook="$1"
+  after_hooks["${#after_hooks[@]}"]="$hook"
+}
+
+# Load plugin hooks.
+OLDIFS="$IFS"
+IFS=$'\n' scripts=(`pyenv-hooks activate`)
+IFS="$OLDIFS"
+for script in "${scripts[@]}"; do source "$script"; done
+
 while [ $# -gt 0 ]; do
   case "$1" in
   "--complete" )
@@ -75,8 +96,8 @@ fi
 venv="${versions}"
 
 if [ -n "${VIRTUAL_ENV}" ]; then
-  # exit as success if some virtualenv is already activated outside from pyenv-virtualenv
-  if [ -z "${PYENV_VIRTUAL_ENV}" ]; then
+  # exit as success if a non-pyenv virtualenv is active
+  if [[ -z $PYENV_VIRTUAL_ENV || $PYENV_VIRTUAL_ENV != "$VIRTUAL_ENV" ]]; then
     if [ -z "${FORCE}" ]; then
       if [ -z "${QUIET}" ]; then
         echo "pyenv-virtualenv: virtualenv \`${VIRTUAL_ENV}' is already activated" 1>&2
@@ -136,6 +157,9 @@ if [[ "${VIRTUAL_ENV}" == "${prefix}" ]]; then
 fi
 
 pyenv-sh-deactivate --force --quiet || true
+
+# Execute `before_activate` hooks.
+for hook in "${before_hooks[@]}"; do eval "$hook"; done
 
 if [ -n "$PYENV_VIRTUALENV_VERBOSE_ACTIVATE" ]; then
   echo "pyenv-virtualenv: activate ${venv}" 1>&2
@@ -221,16 +245,31 @@ if [ -z "${PYENV_VIRTUALENV_DISABLE_PROMPT}" ]; then
   case "${shell}" in
   fish )
     if [ -z "${QUIET}" ]; then
-      echo "pyenv-virtualenv: prompt changing not working for fish." 1>&2
+      cat <<EOS
+functions -e _pyenv_old_prompt              # remove old prompt function if exists. 
+                                            # since everything is in memory, it's safe to
+                                            # remove it.
+functions -c fish_prompt _pyenv_old_prompt  # backup old prompt function
+
+# from python-venv
+function fish_prompt
+    set -l prompt (_pyenv_old_prompt)       # call old prompt function first since it might 
+                                            # read exit status
+    echo -n "(${venv}) "                    # add virtualenv to prompt
+    string join -- \n \$prompt              # handle multiline prompts
+end
+EOS
     fi
     ;;
   * )
-    if [ -z "${QUIET}" ]; then
-      echo "pyenv-virtualenv: prompt changing will be removed from future release. configure \`export PYENV_VIRTUALENV_DISABLE_PROMPT=1' to simulate the behavior." 1>&2
+    if [ -z "${PYENV_VIRTUALENV_PROMPT}" ]; then
+      PYENV_VIRTUALENV_PROMPT="(${venv})"
+    else
+      PYENV_VIRTUALENV_PROMPT="${PYENV_VIRTUALENV_PROMPT/\{venv\}/${venv}}"
     fi
     cat <<EOS
 export _OLD_VIRTUAL_PS1="\${PS1:-}";
-export PS1="(${venv}) \${PS1:-}";
+export PS1="${PYENV_VIRTUALENV_PROMPT} \${PS1:-}";
 EOS
     ;;
   esac
@@ -261,3 +300,6 @@ if [ -d "${prefix}/conda-meta" ] ||
   esac
   shopt -u nullglob
 fi
+
+# Execute `after_activate` hooks.
+for hook in "${after_hooks[@]}"; do eval "$hook"; done

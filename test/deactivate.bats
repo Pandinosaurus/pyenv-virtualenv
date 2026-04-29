@@ -16,6 +16,7 @@ setup() {
   unset PYENV_VIRTUAL_ENV_DISABLE_PROMPT
   unset VIRTUAL_ENV_DISABLE_PROMPT
   unset _OLD_VIRTUAL_PS1
+  stub pyenv-hooks "deactivate : echo"
 }
 
 @test "deactivate virtualenv" {
@@ -54,7 +55,7 @@ EOS
   export VIRTUAL_ENV="${PYENV_ROOT}/versions/venv"
   export PYENV_ACTIVATE_SHELL=
 
-  PYENV_SHELL="bash" run pyenv-sh-deactivate --quit
+  PYENV_SHELL="bash" run pyenv-sh-deactivate --quiet
 
   assert_success
   assert_output <<EOS
@@ -90,36 +91,6 @@ EOS
   assert_success
   assert_output <<EOS
 pyenv-virtualenv: deactivate venv
-unset PYENV_VIRTUAL_ENV;
-unset VIRTUAL_ENV;
-if [ -n "\${_OLD_VIRTUAL_PATH:-}" ]; then
-  export PATH="\${_OLD_VIRTUAL_PATH}";
-  unset _OLD_VIRTUAL_PATH;
-fi;
-if [ -n "\${_OLD_VIRTUAL_PYTHONHOME:-}" ]; then
-  export PYTHONHOME="\${_OLD_VIRTUAL_PYTHONHOME}";
-  unset _OLD_VIRTUAL_PYTHONHOME;
-fi;
-if [ -n "\${_OLD_VIRTUAL_PS1:-}" ]; then
-  export PS1="\${_OLD_VIRTUAL_PS1}";
-  unset _OLD_VIRTUAL_PS1;
-fi;
-if declare -f deactivate 1>/dev/null 2>&1; then
-  unset -f deactivate;
-fi;
-EOS
-}
-
-@test "deactivate virtualenv (quiet)" {
-  export PYENV_VIRTUALENV_INIT=1
-  export PYENV_VIRTUAL_ENV="${PYENV_ROOT}/versions/venv"
-  export VIRTUAL_ENV="${PYENV_ROOT}/versions/venv"
-  export PYENV_ACTIVATE_SHELL=
-
-  PYENV_SHELL="bash" run pyenv-sh-deactivate --quiet
-
-  assert_success
-  assert_output <<EOS
 unset PYENV_VIRTUAL_ENV;
 unset VIRTUAL_ENV;
 if [ -n "\${_OLD_VIRTUAL_PATH:-}" ]; then
@@ -254,6 +225,13 @@ if [ -n "\$_OLD_VIRTUAL_PYTHONHOME" ];
   set -gx PYTHONHOME "\$_OLD_VIRTUAL_PYTHONHOME";
   set -e _OLD_VIRTUAL_PYTHONHOME;
 end;
+# check if old prompt function exists
+if functions -q _pyenv_old_prompt
+  # remove old prompt function if exists.
+  functions -e fish_prompt
+  functions -c _pyenv_old_prompt fish_prompt
+  functions -e _pyenv_old_prompt
+end
 if functions -q deactivate;
   functions -e deactivate;
 end;
@@ -280,6 +258,13 @@ if [ -n "\$_OLD_VIRTUAL_PYTHONHOME" ];
   set -gx PYTHONHOME "\$_OLD_VIRTUAL_PYTHONHOME";
   set -e _OLD_VIRTUAL_PYTHONHOME;
 end;
+# check if old prompt function exists
+if functions -q _pyenv_old_prompt
+  # remove old prompt function if exists.
+  functions -e fish_prompt
+  functions -c _pyenv_old_prompt fish_prompt
+  functions -e _pyenv_old_prompt
+end
 if functions -q deactivate;
   functions -e deactivate;
 end;
@@ -308,6 +293,13 @@ if [ -n "\$_OLD_VIRTUAL_PYTHONHOME" ];
   set -gx PYTHONHOME "\$_OLD_VIRTUAL_PYTHONHOME";
   set -e _OLD_VIRTUAL_PYTHONHOME;
 end;
+# check if old prompt function exists
+if functions -q _pyenv_old_prompt
+  # remove old prompt function if exists.
+  functions -e fish_prompt
+  functions -c _pyenv_old_prompt fish_prompt
+  functions -e _pyenv_old_prompt
+end
 if functions -q deactivate;
   functions -e deactivate;
 end;
@@ -336,6 +328,13 @@ if [ -n "\$_OLD_VIRTUAL_PYTHONHOME" ];
   set -gx PYTHONHOME "\$_OLD_VIRTUAL_PYTHONHOME";
   set -e _OLD_VIRTUAL_PYTHONHOME;
 end;
+# check if old prompt function exists
+if functions -q _pyenv_old_prompt
+  # remove old prompt function if exists.
+  functions -e fish_prompt
+  functions -c _pyenv_old_prompt fish_prompt
+  functions -e _pyenv_old_prompt
+end
 if functions -q deactivate;
   functions -e deactivate;
 end;
@@ -362,6 +361,13 @@ if [ -n "\$_OLD_VIRTUAL_PYTHONHOME" ];
   set -gx PYTHONHOME "\$_OLD_VIRTUAL_PYTHONHOME";
   set -e _OLD_VIRTUAL_PYTHONHOME;
 end;
+# check if old prompt function exists
+if functions -q _pyenv_old_prompt
+  # remove old prompt function if exists.
+  functions -e fish_prompt
+  functions -c _pyenv_old_prompt fish_prompt
+  functions -e _pyenv_old_prompt
+end
 if functions -q deactivate;
   functions -e deactivate;
 end;

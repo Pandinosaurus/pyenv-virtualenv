@@ -1,6 +1,15 @@
 export TMP="$BATS_TEST_DIRNAME/tmp"
 
-PATH=/usr/bin:/usr/sbin:/bin/:/sbin
+# Detect stat format for mtime: GNU uses -c %Y, BSD uses -f %m
+# Must match the detection in bin/pyenv-virtualenv-init
+if stat -L -c %Y / >/dev/null 2>&1; then
+  _stat_fmt="-L -c %Y"
+else
+  _stat_fmt="-L -f %m"
+fi
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+
+PATH=/usr/bin:/usr/sbin:/bin:/sbin
 PATH="$BATS_TEST_DIRNAME/../bin:$PATH"
 PATH="$TMP/bin:$PATH"
 export PATH
@@ -10,19 +19,51 @@ teardown() {
 }
 
 stub() {
+  local FLAG_NO_ORDER=
+  local FLAG_MULTIPLE=
+  while (($#)); do
+    case "$1" in
+      -N|--no-order)
+        FLAG_NO_ORDER=1
+        shift
+        ;;
+      -M|--multiple)
+        FLAG_MULTIPLE=1
+        shift
+        ;;
+      -*)
+        echo "stub: unrecognized switch: $arg" >$2
+        return 1
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+  
+  local FLAGS=-
+  if [[ -n $FLAG_MULTIPLE ]]; then
+    FLAGS=M
+  elif [[ -n $FLAG_NO_ORDER ]]; then
+    FLAGS=N
+  fi
+  
   local program="$1"
   local prefix="$(echo "$program" | tr a-z- A-Z_)"
   shift
 
   export "${prefix}_STUB_PLAN"="${TMP}/${program}-stub-plan"
   export "${prefix}_STUB_RUN"="${TMP}/${program}-stub-run"
+  export "${prefix}_STUB_LOG"="${TMP}/${program}-stub-log"
   export "${prefix}_STUB_END"=
 
   mkdir -p "${TMP}/bin"
   ln -sf "${BATS_TEST_DIRNAME}/stubs/stub" "${TMP}/bin/${program}"
 
   touch "${TMP}/${program}-stub-plan"
-  for arg in "$@"; do printf "%s\n" "$arg" >> "${TMP}/${program}-stub-plan"; done
+  for arg in "$@"; do
+    echo "$FLAGS" "$arg" >> "${TMP}/${program}-stub-plan"
+  done
 }
 
 unstub() {
@@ -74,8 +115,20 @@ assert_failure() {
 
 assert_equal() {
   if [ "$1" != "$2" ]; then
-    { echo "expected: $1"
-      echo "actual:   $2"
+    { echo "expected:"
+      echo "$1"
+      echo "actual:"
+      echo "$2"
+    } | flunk
+  fi
+}
+
+assert_equal_wildcards() {
+  if [[ $1 != $2 ]]; then
+    { echo "expected:"
+      echo "$2"
+      echo "actual:"
+      echo "$1"
     } | flunk
   fi
 }
@@ -86,6 +139,14 @@ assert_output() {
   else expected="$1"
   fi
   assert_equal "$expected" "$output"
+}
+
+assert_output_wildcards() {
+  local expected
+  if [ $# -eq 0 ]; then expected="$(cat -)"
+  else expected="$1"
+  fi
+  assert_equal_wildcards "$output" "$expected"
 }
 
 assert_output_contains() {
@@ -168,3 +229,4 @@ setup_conda() {
 teardown_conda() {
   rm -fr "${PYENV_ROOT}/versions/$1"
 }
+

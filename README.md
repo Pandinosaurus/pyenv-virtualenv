@@ -28,21 +28,33 @@ From inside that directory you can:
  - Get the latest development release by running `git pull` to download the
    latest changes.
 
+💡 **WSL note:** If you're using WSL, we recommend setting Git to use Unix-style line endings to prevent script execution errors:
+
+```sh
+git config --global core.autocrlf input
+```
+
 1. **Check out pyenv-virtualenv into plugin directory**
 
-    ```sh
-    $ git clone https://github.com/pyenv/pyenv-virtualenv.git $(pyenv root)/plugins/pyenv-virtualenv
+    ```bash
+    git clone https://github.com/pyenv/pyenv-virtualenv.git $(pyenv root)/plugins/pyenv-virtualenv
+    ```
+
+    For the Fish shell:
+
+    ```fish
+    git clone https://github.com/pyenv/pyenv-virtualenv.git (pyenv root)/plugins/pyenv-virtualenv
     ```
 
 2. (OPTIONAL) **Add `pyenv virtualenv-init` to your shell** to enable auto-activation of virtualenvs. This is entirely optional but pretty useful. See "Activate virtualenv" below.
 
-    ```sh
-    $ echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
+    ```bash
+    echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
     ```
 
     **Fish shell note**:  Add this to your `~/.config/fish/config.fish`
 
-    ```sh
+    ```fish
     status --is-interactive; and pyenv virtualenv-init - | source
     ```
 
@@ -50,8 +62,8 @@ From inside that directory you can:
     
 3. **Restart your shell to enable pyenv-virtualenv**
 
-    ```sh
-    $ exec "$SHELL"
+    ```bash
+    exec "$SHELL"
     ```
 
 
@@ -66,17 +78,17 @@ installed, you will also be able to use the `pyenv virtualenv` command.
  with Homebrew.*
 
 ```sh
-$ brew install pyenv-virtualenv
+brew install pyenv-virtualenv
 ```
 
 Or, if you would like to install the latest development release:
 
 ```sh
-$ brew install --HEAD pyenv-virtualenv
+brew install --HEAD pyenv-virtualenv
 ```
 
 After installation, you'll still need to do
-[Pyenv shell setup steps](https://github.com/pyenv/pyenv#basic-github-checkout)
+[Pyenv shell setup steps](https://github.com/pyenv/pyenv#b-set-up-your-shell-environment-for-pyenv)
 then add 
 ```sh
 eval "$(pyenv virtualenv-init -)"
@@ -93,12 +105,15 @@ To create a virtualenv for the Python version used with pyenv, run
 of the virtualenv directory. For example,
 
 ```sh
-$ pyenv virtualenv 2.7.10 my-virtual-env-2.7.10
+pyenv virtualenv 2.7.10 my-virtual-env-2.7.10
 ```
 
 will create a virtualenv based on Python 2.7.10 under `$(pyenv root)/versions` in a
 folder called `my-virtual-env-2.7.10`.
 
+`pyenv virtualenv` forwards any options to the underlying command that actually
+creates the virtual environment (`conda`, `virtualenv`, or `python -m venv`).
+See the output of `pyenv virtualenv --help` for details.
 
 ### Create virtualenv from current version
 
@@ -234,6 +249,7 @@ You can set certain environment variables to control pyenv-virtualenv.
 * `PIP_VERSION`, if set and `venv` is preferred
   over `virtualenv`, install the specified version of pip.
 * `PYENV_VIRTUALENV_VERBOSE_ACTIVATE`, if set, shows some verbose outputs on activation and deactivation
+* `PYENV_VIRTUALENV_PROMPT`, if set, allows users to customize how `pyenv-virtualenv` modifies their shell prompt. The default prompt ("(venv)") is overwritten with any user-specified text. Specify the location of the virtual environment name with the string `{venv}`. For example, the default prompt string would be `({venv})`.
 
 ## Version History
 

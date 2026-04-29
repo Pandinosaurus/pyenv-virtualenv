@@ -6,10 +6,14 @@
 #        pyenv virtualenv --version
 #        pyenv virtualenv --help
 #
-#   -f/--force       Install even if the version appears to be installed already
+#   -f/--force       Install even if the version appears to be installed already. Skip
+#                    prompting for confirmation
+#
+# Notable VIRTUALENV_OPTIONS passed to venv-creating executable, if applicable:
+#   -u/--upgrade     Imply --force
 #
 
-PYENV_VIRTUALENV_VERSION="1.1.5"
+PYENV_VIRTUALENV_VERSION="1.4.0"
 
 set -e
 [ -n "$PYENV_DEBUG" ] && set -x
@@ -20,7 +24,7 @@ fi
 
 # Provide pyenv completions
 if [ "$1" = "--complete" ]; then
-  exec pyenv-versions --bare
+  exec pyenv-versions --bare --skip-envs
 fi
 
 unset PIP_REQUIRE_VENV
@@ -48,6 +52,12 @@ parse_options() {
       ARGUMENTS[${#ARGUMENTS[*]}]="$arg"
     fi
   done
+}
+
+colorize() {
+  if [ -t 1 ]; then printf "\e[%sm%s\e[m" "$1" "$2"
+  else echo -n "$2"
+  fi
 }
 
 resolve_link() {
@@ -145,9 +155,17 @@ detect_venv() {
     if [ -x "${prefix}/bin/virtualenv" ]; then
       HAS_VIRTUALENV=1
     fi
-    # Prefer `python3.x` executable if available (#206, #282)
     local python
-    for python in "python${PYENV_VERSION%.*}" "python${PYENV_VERSION%%.*}" "python"; do
+    local -a pythons
+    if [[ $PYENV_VERSION == "system" ]]; then
+      # Prefer `python3.x` executable if available (#206, #282)
+      pythons=("python3" "python" "python2")
+    else
+      # as per PEP 394, custom activated Python environments should provide the "python" command
+      # this includes Pyenv-provided installations
+      pythons=("python")
+    fi
+    for python in "${pythons[@]}"; do
       if pyenv-exec "${python}" -m venv --help 1>/dev/null 2>&1; then
         HAS_M_VENV=1
         M_VENV_PYTHON_BIN="${python}"
@@ -306,6 +324,10 @@ else
   VIRTUALENV_NAME="${ARGUMENTS[1]}"
 fi
 
+if [[ -n "${VERSION_NAME}" ]] && command -v pyenv-latest >/dev/null; then
+  VERSION_NAME="$(pyenv-latest -f "${VERSION_NAME}")"
+fi
+
 if [ -z "${VERSION_NAME}" ] || [ -z "${VIRTUALENV_NAME}" ]; then
   usage 1
 fi
@@ -328,10 +350,20 @@ fi
 # Set VERSION_NAME as default version in this script
 export PYENV_VERSION="${VERSION_NAME}"
 
+not_installed_message() {
+    local is_available=$(python-build --definitions | grep -F -x "$1")
+    echo "pyenv-virtualenv: \`${1}' is not installed in pyenv." 1>&2
+    if [[ $is_available ]]; then
+        echo "Run \`pyenv install ${1}' to install it." 1>&2
+    else
+        echo "It does not look like a valid Python version. See \`pyenv install --list' for available versions." 1>&2
+    fi
+}
+
 # Source version must exist before creating virtualenv.
 PREFIX="$(pyenv-prefix 2>/dev/null || true)"
 if [ ! -d "${PREFIX}" ]; then
-  echo "pyenv-virtualenv: \`${PYENV_VERSION}' is not installed in pyenv." 1>&2
+  not_installed_message "${PYENV_VERSION}"
   exit 1
 fi
 
@@ -433,7 +465,8 @@ else
           if [ -x "${python}" ]; then
             VIRTUALENV_OPTIONS[${#VIRTUALENV_OPTIONS[*]}]="--python=${python}"
           else
-            echo "pyenv-virtualenv: \`${VIRTUALENV_PYTHON##*/}' is not installed in pyenv." 1>&2
+            # echo "pyenv-virtualenv: \`${VIRTUALENV_PYTHON##*/}' is not installed in pyenv." 1>&2
+            not_installed_message "${VIRTUALENV_PYTHON##*/}"
             exit 1
           fi
         fi
@@ -572,7 +605,13 @@ STATUS=0
 mkdir -p "${PYENV_VIRTUALENV_CACHE_PATH}"
 cd "${PYENV_VIRTUALENV_CACHE_PATH}"
 if [ -n "${USE_CONDA}" ]; then
-  pyenv-exec conda create $QUIET $VERBOSE --name "${VIRTUALENV_PATH##*/}" --yes "${VIRTUALENV_OPTIONS[@]}" python || STATUS="$?"
+  if [ -z "$VIRTUALENV_PYTHON" ]; then
+    #process substitution doesn't seem to work unless it's directly inserted to the command line
+    #if we add it to VIRTUALENV_OPTIONS instead, "broken pipe" happens
+    pyenv-exec conda create $QUIET $VERBOSE --name "${VIRTUALENV_PATH##*/}" --yes "${VIRTUALENV_OPTIONS[@]}" --file <(pyenv-exec conda list python --full-name --export) || STATUS="$?"
+  else
+    pyenv-exec conda create $QUIET $VERBOSE --name "${VIRTUALENV_PATH##*/}" --yes "${VIRTUALENV_OPTIONS[@]}" || STATUS="$?"
+  fi
 else
   if [ -n "${USE_M_VENV}" ]; then
     pyenv-exec "${M_VENV_PYTHON_BIN:-python}" -m venv $QUIET $VERBOSE "${VIRTUALENV_OPTIONS[@]}" "${VIRTUALENV_PATH}" || STATUS="$?"
@@ -581,9 +620,19 @@ else
   fi
 fi
 
+(
+  shopt -s nullglob
+  for extra_binary in "$PREFIX"/bin/python*-config; do
+    extra_binary_linkname="$VIRTUALENV_PATH/bin/$(basename $extra_binary)"
+    [[ -e "$extra_binary_linkname" ]] || \
+        ln -s "$extra_binary" "$extra_binary_linkname"
+  done
+)
+
 ## Create symlink in the `versions` directory for backward compatibility
 if [ -d "${VIRTUALENV_PATH}" ] && [ -n "${COMPAT_VIRTUALENV_PATH}" ]; then
-  ln -fs "${VIRTUALENV_PATH}" "${COMPAT_VIRTUALENV_PATH}"
+  # Overwrite an existing link, can happen if running with -f
+  ln -fsn "${VIRTUALENV_PATH}" "${COMPAT_VIRTUALENV_PATH}"
 fi
 
 if [ ! -e "${VIRTUALENV_PATH}/bin/pydoc" ]; then

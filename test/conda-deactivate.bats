@@ -16,6 +16,11 @@ setup() {
   unset PYENV_VIRTUAL_ENV_DISABLE_PROMPT
   unset VIRTUAL_ENV_DISABLE_PROMPT
   unset _OLD_VIRTUAL_PS1
+  stub pyenv-hooks "deactivate : echo"
+}
+
+teardown() {
+  unstub pyenv-hooks
 }
 
 @test "deactivate conda root" {
@@ -77,6 +82,13 @@ if [ -n "\$_OLD_VIRTUAL_PYTHONHOME" ];
   set -gx PYTHONHOME "\$_OLD_VIRTUAL_PYTHONHOME";
   set -e _OLD_VIRTUAL_PYTHONHOME;
 end;
+# check if old prompt function exists
+if functions -q _pyenv_old_prompt
+  # remove old prompt function if exists.
+  functions -e fish_prompt
+  functions -c _pyenv_old_prompt fish_prompt
+  functions -e _pyenv_old_prompt
+end
 if functions -q deactivate;
   functions -e deactivate;
 end;
